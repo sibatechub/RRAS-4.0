@@ -1,0 +1,2478 @@
+function onFormSubmit(e) {
+
+const sheet =
+e.range.getSheet();
+
+// Only run for STAFF_MASTER sheet
+if (sheet.getName() !== "STAFF_MASTER") {
+  return;
+}
+
+const row =
+e.range.getRow();
+
+
+const name =
+sheet.getRange(row,2).getValue();
+
+
+const mobile =
+sheet.getRange(row,3).getValue();
+
+
+const email =
+sheet.getRange(row,4).getValue();
+
+
+const dob =
+Utilities.formatDate(
+ new Date(sheet.getRange(row,5).getValue()),
+ Session.getScriptTimeZone(),
+ "dd/MM/yyyy"
+);
+
+
+const aadhar =
+sheet.getRange(row,6).getValue();
+
+
+const address =
+sheet.getRange(row,7).getValue();
+
+
+const employmentType =
+sheet.getRange(row,8).getValue();
+
+
+const examRole =
+sheet.getRange(row,9).getValue();
+
+
+const resourceId =
+sheet.getRange(row,10).getValue();
+
+
+sheet.getRange(row,11)
+.setValue("YES");
+
+
+sheet.getRange(row,12)
+.setValue("RRAS@123");
+
+
+const template =
+HtmlService.createTemplateFromFile(
+"WelcomeEmail"
+);
+
+
+template.name = name;
+template.mobile = mobile;
+template.email = email;
+template.dob = dob;
+template.aadhar = aadhar;
+template.address = address;
+template.employmentType = employmentType;
+template.examRole = examRole;
+template.resourceId = resourceId;
+
+
+const html =
+template
+.evaluate()
+.getContent();
+
+
+MailApp.sendEmail({
+
+
+to: email,
+subject:
+ "Welcome to Radha Raman Assessment Services Pvt Ltd",
+htmlBody: html
+
+
+});
+
+
+}
+const LOGIN_SPREADSHEET_ID =
+"1yZgqB4xZzOl1PFS_UGwhggK_cz1jctuJSRM6mqB5FS4";
+function doGet() {
+
+
+ return HtmlService
+   .createHtmlOutputFromFile("Login")
+   .setTitle("RRAS Attendance Portal");
+
+
+}
+
+
+
+
+function getExamInfo() {
+
+
+ const ss =
+   SpreadsheetApp.openById(
+     LOGIN_SPREADSHEET_ID
+   );
+
+
+ const sheet =
+   ss.getSheetByName(
+     "Exam_Details"
+   );
+
+
+ const data =
+   sheet.getDataRange()
+   .getValues();
+
+
+ const today =
+   Utilities.formatDate(
+     new Date(),
+     Session.getScriptTimeZone(),
+     "dd-MM-yyyy"
+   );
+
+
+ for(let i=1;i<data.length;i++){
+
+
+   const rowDate =
+     Utilities.formatDate(
+       new Date(data[i][1]),
+       Session.getScriptTimeZone(),
+       "dd-MM-yyyy"
+     );
+
+
+   if(rowDate === today){
+
+
+     return {
+
+
+       date: rowDate,
+       examName: data[i][2],
+       totalShift: data[i][3]
+
+
+     };
+
+
+   }
+
+
+ }
+
+
+ return {
+
+
+   date: today,
+   examName: "No Exam Scheduled",
+   totalShift: "-"
+
+
+ };
+
+
+}
+function loginUser(
+  resourceId,
+  password,
+  latitude,
+  longitude
+){
+
+  const ss =
+    SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const staffSheet =
+    ss.getSheetByName("STAFF_MASTER");
+
+  const data =
+    staffSheet.getDataRange().getValues();
+
+  for(let i=1;i<data.length;i++){
+
+    if(
+      String(data[i][9]).trim() ===
+      String(resourceId).trim()
+    ){
+
+      // Password incorrect
+      if(
+        String(data[i][11]).trim() !==
+        String(password).trim()
+      ){
+
+        return{
+          success:false,
+          message:"Invalid Password"
+        };
+
+      }
+
+      // Staff not assigned today
+      if(
+        String(data[i][10]).trim().toUpperCase() !== "YES"
+      ){
+
+        return{
+          success:false,
+          message:"You are not mapped for today's examination duty.\n\nPlease contact your Center Head."
+        };
+
+      }
+
+      // Login Success
+      return{
+
+        success:true,
+
+        name:data[i][1],
+        mobile:data[i][2],
+        email:data[i][3],
+
+        dob:Utilities.formatDate(
+          new Date(data[i][4]),
+          Session.getScriptTimeZone(),
+          "dd/MM/yyyy"
+        ),
+
+        aadhar:data[i][5],
+        address:data[i][6],
+        employment:data[i][7],
+        role:data[i][8],
+        resourceId:data[i][9],
+        status:data[i][10]
+
+      };
+
+    }
+
+  }
+
+  // Resource ID not found
+  return{
+
+    success:false,
+    message:"Invalid Resource ID"
+
+  };
+
+}
+function getTodayAttendance(resourceId){
+
+  const ss =
+    SpreadsheetApp.openById(
+      LOGIN_SPREADSHEET_ID
+    );
+
+  const sheet =
+    ss.getSheetByName(
+      "ATTENDANCE_LOG"
+    );
+
+  const data =
+    sheet.getDataRange()
+    .getValues();
+
+  const today =
+    Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone(),
+      "dd-MM-yyyy"
+    );
+
+  for(let i=data.length-1;i>=1;i--){
+
+    const rowDate =
+      Utilities.formatDate(
+        new Date(data[i][0]),
+        Session.getScriptTimeZone(),
+        "dd-MM-yyyy"
+      );
+
+    if(
+      rowDate === today &&
+      String(data[i][9]).trim() ===
+      String(resourceId).trim()
+    ){
+
+      return {
+
+        found:true,
+
+        checkIn:
+        data[i][10]
+        ?
+        Utilities.formatDate(
+          new Date(data[i][10]),
+          Session.getScriptTimeZone(),
+          "hh:mm a"
+        )
+        :
+        "-",
+
+        checkOut:
+        data[i][11]
+        ?
+        Utilities.formatDate(
+          new Date(data[i][11]),
+          Session.getScriptTimeZone(),
+          "hh:mm a"
+        )
+        :
+        "-",
+
+        duration:
+        data[i][12] || "-",
+
+        status:
+        data[i][20] || "-"
+
+      };
+
+    }
+
+  }
+
+  return {found:false};
+
+}
+function calculateDistance(
+ lat1,
+ lon1,
+ lat2,
+ lon2
+) {
+
+
+ const R = 6371000;
+
+
+ const dLat =
+   (lat2 - lat1) *
+   Math.PI / 180;
+
+
+ const dLon =
+   (lon2 - lon1) *
+   Math.PI / 180;
+
+
+ const a =
+
+
+   Math.sin(dLat / 2) *
+   Math.sin(dLat / 2)
+
+
+   +
+
+
+   Math.cos(
+     lat1 * Math.PI / 180
+   )
+
+
+   *
+
+
+   Math.cos(
+     lat2 * Math.PI / 180
+   )
+
+
+   *
+
+
+   Math.sin(dLon / 2) *
+   Math.sin(dLon / 2);
+
+
+ const c =
+   2 *
+   Math.atan2(
+     Math.sqrt(a),
+     Math.sqrt(1 - a)
+   );
+
+
+ return R * c;
+
+
+}
+function saveCheckIn(
+  userData,
+  latitude,
+  longitude,
+  fullDevice,
+  deviceInfo
+){
+
+
+ const ss =
+   SpreadsheetApp.openById(
+     LOGIN_SPREADSHEET_ID
+   );
+
+
+ const attendanceSheet =
+   ss.getSheetByName(
+     "ATTENDANCE_LOG"
+   );
+
+
+ const settingsSheet =
+   ss.getSheetByName(
+     "SETTINGS"
+   );
+   const ownerEmail =
+   settingsSheet
+   .getRange("D2")
+   .getValue();
+
+
+ const centerLat =
+   settingsSheet.getRange("A2").getValue();
+
+
+ const centerLng =
+   settingsSheet.getRange("B2").getValue();
+
+
+ const distance =
+   Math.round(
+     calculateDistance(
+       Number(centerLat),
+       Number(centerLng),
+       Number(latitude),
+       Number(longitude)
+     )
+   );
+   const radius =
+  settingsSheet.getRange("C2")
+  .getValue();
+
+if(distance > radius){
+
+  return {
+
+    success:false,
+
+    message:
+    "You are outside center by " +
+    distance +
+    " meters"
+
+  };
+
+}
+
+
+ const today =
+   Utilities.formatDate(
+     new Date(),
+     Session.getScriptTimeZone(),
+     "dd-MM-yyyy"
+   );
+   const rows =
+attendanceSheet
+.getDataRange()
+.getValues();
+
+
+
+for(let i=rows.length-1;i>=1;i--){
+
+
+ const rowDate =
+   Utilities.formatDate(
+     new Date(rows[i][0]),
+     Session.getScriptTimeZone(),
+     "dd-MM-yyyy"
+   );
+
+
+ if(
+
+
+   rowDate === today &&
+
+
+   String(rows[i][9]).trim() ===
+   String(userData.resourceId).trim()
+
+
+ ){
+
+
+   return {
+
+
+     success:false,
+     message:"Already Checked-In Today"
+
+
+   };
+
+
+ }
+
+
+}
+
+
+attendanceSheet.appendRow([
+
+   today,
+   userData.name,
+   userData.mobile,
+   userData.email,
+   userData.dob,
+   userData.aadhar,
+   userData.address,
+   userData.employment,
+   userData.role,
+   userData.resourceId,
+   new Date(),
+   "",
+   "",
+   latitude,
+   longitude,
+   "",
+   "",
+   distance,
+   "",
+fullDevice,
+"Checked-In",
+"",
+"",
+deviceInfo
+
+]);
+const checkInTime =
+Utilities.formatDate(
+  new Date(),
+  Session.getScriptTimeZone(),
+  "hh:mm a"
+);
+
+const todayDate =
+Utilities.formatDate(
+  new Date(),
+  Session.getScriptTimeZone(),
+  "dd/MM/yyyy"
+);
+const mailSubject =
+  "RRAS Attendance - " + todayDate;
+
+const html = `
+<div style="font-family:Arial,sans-serif;
+max-width:650px;
+margin:auto;
+border:1px solid #ddd;
+border-radius:10px;
+overflow:hidden;">
+
+<div style="
+background:#1e3a8a;
+padding:20px;
+color:white;
+text-align:center;">
+
+<h2>
+RADHA RAMAN ASSESSMENT SERVICES
+</h2>
+
+<p>
+Attendance Check-In Confirmation
+</p>
+
+</div>
+
+<div style="padding:20px;">
+
+<p>
+Dear <b>${userData.name}</b>,
+</p>
+
+<p>
+Your attendance has been successfully recorded.
+</p>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+">
+
+<tr>
+<td><b>Name</b></td>
+<td>${userData.name}</td>
+</tr>
+
+<tr>
+<td><b>Resource ID</b></td>
+<td>${userData.resourceId}</td>
+</tr>
+
+<tr>
+<td><b>Role</b></td>
+<td>${userData.role}</td>
+</tr>
+
+<tr>
+<td><b>Date</b></td>
+<td>${todayDate}</td>
+</tr>
+
+<tr>
+<td><b>Check-In Time</b></td>
+<td>${checkInTime}</td>
+</tr>
+
+<tr>
+<td><b>Distance From Center</b></td>
+<td>${distance} meters</td>
+</tr>
+
+<tr>
+<td><b>Status</b></td>
+<td style="color:green;">
+Checked-In Successfully
+</td>
+</tr>
+
+</table>
+
+<br>
+
+<div style="
+background:#f3f4f6;
+padding:15px;
+border-left:4px solid #22c55e;
+">
+
+Please report to your examination duties and complete all assigned responsibilities.
+
+</div>
+
+<br>
+
+Regards,<br>
+<b>RRAS Attendance System</b><br>
+Radha Raman Assessment Services Pvt Ltd
+
+</div>
+
+<div style="
+background:#f8fafc;
+padding:15px;
+text-align:center;
+font-size:12px;
+color:#666;">
+
+This is an automated email.
+Please do not reply.
+
+</div>
+
+</div>
+`;
+
+const message = GmailApp.sendEmail(
+  userData.email,
+  mailSubject,
+  "",
+  {
+    htmlBody: html
+  }
+);
+
+Utilities.sleep(5000);
+
+const threads = GmailApp.search(
+  'to:"' +
+  userData.email +
+  '" subject:"' +
+  mailSubject +
+  '" newer_than:1d'
+);
+
+if(threads.length > 0){
+
+  attendanceSheet
+    .getRange(
+      attendanceSheet.getLastRow(),
+      22
+    )
+    .setValue(
+      threads[0].getId()
+    );
+
+}
+
+
+return {
+   success:true,
+   message:"Check-In Successful",
+};
+
+
+}
+function getUserByResourceId(resourceId){
+
+
+ const ss =
+   SpreadsheetApp.openById(
+     LOGIN_SPREADSHEET_ID
+   );
+
+
+ const sheet =
+   ss.getSheetByName(
+     "STAFF_MASTER"
+   );
+
+
+ const data =
+   sheet.getDataRange()
+   .getValues();
+
+
+ for(let i=1;i<data.length;i++){
+
+
+   if(
+     String(data[i][9]).trim() ===
+     String(resourceId).trim()
+   ){
+
+
+     return {
+
+
+       name:data[i][1],
+       mobile:data[i][2],
+       email:data[i][3],
+       dob:data[i][4],
+       aadhar:data[i][5],
+       address:data[i][6],
+       employment:data[i][7],
+       role:data[i][8],
+       resourceId:data[i][9],
+       status:data[i][10]
+
+
+     };
+
+
+   }
+
+
+ }
+
+
+ return null;
+
+
+}
+function getDashboardUser(resourceId){
+
+
+ const ss =
+   SpreadsheetApp.openById(
+     LOGIN_SPREADSHEET_ID
+   );
+
+
+ const sheet =
+   ss.getSheetByName(
+     "STAFF_MASTER"
+   );
+
+
+ const data =
+   sheet.getDataRange()
+   .getValues();
+
+
+ for(let i=1;i<data.length;i++){
+
+
+   if(
+     String(data[i][9]).trim() ===
+     String(resourceId).trim()
+   ){
+
+
+     return {
+
+
+ name:data[i][1],
+ mobile:data[i][2],
+ email:data[i][3],
+
+
+ dob: Utilities.formatDate(
+   new Date(data[i][4]),
+   Session.getScriptTimeZone(),
+   "dd/MM/yyyy"
+ ),
+
+
+ aadhar:data[i][5],
+ address:data[i][6],
+ employment:data[i][7],
+
+
+ role:data[i][8],
+ resourceId:data[i][9],
+ status:data[i][10]
+
+
+};
+
+
+   }
+
+
+ }
+
+
+ return null;
+}
+function getWebAppUrl() {
+
+
+ return ScriptApp.getService().getUrl();
+
+
+}
+function saveCheckOut(
+  resourceId,
+  latitude,
+  longitude,
+  shiftCount,
+  checkoutDevice
+){
+
+
+ const ss =
+   SpreadsheetApp.openById(
+     LOGIN_SPREADSHEET_ID
+   );
+
+
+ const attendanceSheet =
+   ss.getSheetByName(
+     "ATTENDANCE_LOG"
+   );
+
+
+ const settingsSheet =
+   ss.getSheetByName(
+     "SETTINGS"
+   );
+
+
+ const centerLat =
+   settingsSheet.getRange("A2").getValue();
+
+
+ const centerLng =
+   settingsSheet.getRange("B2").getValue();
+
+
+ const distance =
+   Math.round(
+     calculateDistance(
+       Number(centerLat),
+       Number(centerLng),
+       Number(latitude),
+       Number(longitude)
+     )
+   );
+   const radius =
+  settingsSheet.getRange("C2")
+  .getValue();
+
+if(distance > radius){
+
+  return {
+
+    success:false,
+
+    message:
+    "You are outside center by " +
+    distance +
+    " meters"
+
+  };
+
+}
+
+
+ const today =
+   Utilities.formatDate(
+     new Date(),
+     Session.getScriptTimeZone(),
+     "dd-MM-yyyy"
+   );
+
+
+ const rows =
+   attendanceSheet
+   .getDataRange()
+   .getValues();
+   // ===============================
+// VERIFY ASSIGNED SHIFT
+// ===============================
+
+const staffSheet =
+ss.getSheetByName("STAFF_MASTER");
+
+const staffData =
+staffSheet.getDataRange().getValues();
+
+let assignedShift = "";
+
+for(let k=1;k<staffData.length;k++){
+
+  if(
+    String(staffData[k][9]).trim() ===
+    String(resourceId).trim()
+  ){
+
+    assignedShift = Number(staffData[k][12]);
+    break;
+
+  }
+
+}
+
+// Check whether entered shift matches assigned shift
+if(Number(shiftCount) !== assignedShift){
+
+  return{
+
+    success:false,
+
+    message:
+    "You are assigned for " +
+    assignedShift +
+    " shift(s) by the Center Head.\n\nYou cannot enter " +
+    shiftCount +
+    " shift(s)."
+
+  };
+
+}
+
+
+ for(let i=rows.length-1;i>=1;i--){
+
+
+   const rowDate =
+     Utilities.formatDate(
+       new Date(rows[i][0]),
+       Session.getScriptTimeZone(),
+       "dd-MM-yyyy"
+     );
+
+
+   if(
+
+
+     rowDate === today &&
+
+
+     String(rows[i][9]).trim() ===
+     String(resourceId).trim()
+
+
+   ){
+
+
+     const checkInTime =
+       new Date(rows[i][10]);
+
+
+     const checkOutTime =
+       new Date();
+
+
+     const durationMs =
+       checkOutTime - checkInTime;
+
+
+     const hours =
+       Math.floor(durationMs / 3600000);
+
+
+     const minutes =
+       Math.floor(
+         (durationMs % 3600000) / 60000
+       );
+
+
+     const duration =
+       hours + " Hr " +
+       minutes + " Min";
+
+
+     attendanceSheet
+       .getRange(i+1,12)
+       .setValue(checkOutTime);
+
+
+     attendanceSheet
+       .getRange(i+1,13)
+       .setValue(duration);
+
+
+     attendanceSheet
+       .getRange(i+1,16)
+       .setValue(latitude);
+
+
+     attendanceSheet
+       .getRange(i+1,17)
+       .setValue(longitude);
+
+
+     attendanceSheet
+       .getRange(i+1,19)
+       .setValue(distance);
+
+
+     attendanceSheet
+       .getRange(i+1,21)
+       .setValue("Checked-Out");
+attendanceSheet
+.getRange(i+1,23)
+.setValue(shiftCount);
+attendanceSheet
+.getRange(i+1,25)
+.setValue(checkoutDevice);
+//==============================
+// AUTO PAYMENT CALCULATION
+//==============================
+
+const paymentSheet =
+ss.getSheetByName("Payment Details");
+
+const paymentData =
+paymentSheet.getDataRange().getValues();
+
+const role = rows[i][8];        // Exam Role (Column I)
+const shift = Number(shiftCount);
+
+let amount = 0;
+
+for (let j = 1; j < paymentData.length; j++) {
+
+  if (
+      String(paymentData[j][1]).trim() === String(role).trim() &&
+      Number(paymentData[j][2]) === shift
+  ) {
+
+      amount = Number(paymentData[j][3]);
+      break;
+
+  }
+
+}
+
+// Save Amount in Column Z
+attendanceSheet
+  .getRange(i + 1, 26)
+  .setValue(amount);
+const threadId =
+attendanceSheet
+  .getRange(i + 1, 22)
+  .getValue();
+
+Logger.log("Thread ID = " + threadId);
+
+const userEmail =
+attendanceSheet
+  .getRange(i + 1, 4)
+  .getValue();
+
+const checkoutDate =
+Utilities.formatDate(
+  checkOutTime,
+  Session.getScriptTimeZone(),
+  "dd/MM/yyyy"
+);
+
+const checkoutClock =
+Utilities.formatDate(
+  checkOutTime,
+  Session.getScriptTimeZone(),
+  "hh:mm a"
+);
+
+const checkoutHtml = `
+<div style="font-family:Arial,sans-serif;
+max-width:650px;
+margin:auto;
+border:1px solid #ddd;
+border-radius:10px;
+overflow:hidden;">
+
+<div style="
+background:#1e3a8a;
+padding:20px;
+color:white;
+text-align:center;">
+
+<h2>
+RADHA RAMAN ASSESSMENT SERVICES
+</h2>
+
+<p>
+Attendance Check-Out Confirmation
+</p>
+
+</div>
+
+<div style="padding:20px;">
+
+<p>
+Dear <b>${rows[i][1]}</b>,
+</p>
+
+<p>
+Your check-out attendance has been successfully recorded.
+</p>
+
+<table
+style="
+width:100%;
+border-collapse:collapse;
+">
+
+<tr>
+<td><b>Name</b></td>
+<td>${rows[i][1]}</td>
+</tr>
+
+<tr>
+<td><b>Resource ID</b></td>
+<td>${resourceId}</td>
+</tr>
+
+<tr>
+<td><b>Date</b></td>
+<td>${checkoutDate}</td>
+</tr>
+
+<tr>
+<td><b>Check-In Time</b></td>
+<td>
+${Utilities.formatDate(
+  checkInTime,
+  Session.getScriptTimeZone(),
+  "hh:mm a"
+)}
+</td>
+</tr>
+
+<tr>
+<td><b>Check-Out Time</b></td>
+<td>${checkoutClock}</td>
+</tr>
+
+<tr>
+<td><b>Duration</b></td>
+<td>${duration}</td>
+</tr>
+
+<tr>
+<td><b>Shift Count</b></td>
+<td>${shiftCount}</td>
+</tr>
+
+<tr>
+<td><b>Distance From Center</b></td>
+<td>${distance} meters</td>
+</tr>
+
+<tr>
+<td><b>Status</b></td>
+<td style="color:red;">
+Checked-Out Successfully
+</td>
+</tr>
+
+</table>
+
+<br>
+
+<div style="
+background:#f3f4f6;
+padding:15px;
+border-left:4px solid #ef4444;
+">
+
+Your examination duties have been completed successfully.
+
+Thank you for your contribution to the examination process.
+
+</div>
+
+<br>
+
+Regards,<br>
+<b>RRAS Attendance System</b><br>
+Radha Raman Assessment Services Pvt Ltd
+
+</div>
+
+<div style="
+background:#f8fafc;
+padding:15px;
+text-align:center;
+font-size:12px;
+color:#666;">
+
+This is an automated email.
+Please do not reply.
+
+</div>
+
+</div>
+`;
+
+if(threadId){
+
+  try{
+
+const threadId =
+attendanceSheet
+.getRange(i+1,22)
+.getValue();
+
+if(threadId){
+
+  GmailApp
+    .getThreadById(threadId)
+    .replyAll(
+      "",
+      {
+        htmlBody: checkoutHtml
+      }
+    );
+
+}
+
+  }
+  catch(err){
+
+    Logger.log(err);
+
+  }
+
+}
+
+
+     return {
+       success:true,
+       message:"Check-Out Successful"
+     };
+
+
+   }
+
+
+ }
+
+
+ return {
+   success:false,
+   message:"No Check-In Found Today"
+ };
+
+
+}
+
+function getAttendanceHistory(resourceId){
+
+  Logger.log("Resource = " + resourceId);
+
+  const ss =
+    SpreadsheetApp.openById(
+      LOGIN_SPREADSHEET_ID
+    );
+
+  const sheet =
+    ss.getSheetByName(
+      "ATTENDANCE_LOG"
+    );
+
+  const data =
+    sheet.getDataRange()
+    .getValues();
+
+  let result = [];
+
+  for(let i=data.length-1;i>=1;i--){
+
+    Logger.log(
+      "Sheet Resource = " +
+      data[i][9]
+    );
+
+    if(
+      String(data[i][9]).trim() ===
+      String(resourceId).trim()
+    ){
+
+      result.push({
+
+        date:data[i][0],
+        checkIn:data[i][10],
+        checkOut:data[i][11],
+        duration:data[i][12],
+        status:data[i][20]
+
+      });
+
+    }
+
+  }
+
+  Logger.log(
+    JSON.stringify(result)
+  );
+
+  return result;
+
+}
+function sendAttendanceReport(
+  resourceId,
+  fromDate,
+  toDate
+){
+
+  const ss =
+    SpreadsheetApp.openById(
+      LOGIN_SPREADSHEET_ID
+    );
+
+  const attendance =
+    ss.getSheetByName(
+      "ATTENDANCE_LOG"
+    );
+
+  const rows =
+    attendance.getDataRange()
+    .getValues();
+
+  const user =
+    getDashboardUser(resourceId);
+
+  let html = `
+  <h2>Attendance Report</h2>
+
+  <table border='1'
+  cellpadding='5'
+  cellspacing='0'>
+
+  <tr>
+  <th>Date</th>
+  <th>Check-In</th>
+  <th>Check-Out</th>
+  <th>Duration</th>
+  </tr>
+  `;
+
+  for(let i=1;i<rows.length;i++){
+
+    const rowDate =
+      Utilities.formatDate(
+        new Date(rows[i][0]),
+        Session.getScriptTimeZone(),
+        "yyyy-MM-dd"
+      );
+
+    if(
+
+      String(rows[i][9]).trim() ==
+      String(resourceId).trim()
+
+      &&
+
+      rowDate >= fromDate
+
+      &&
+
+      rowDate <= toDate
+
+    ){
+
+const reportDate =
+Utilities.formatDate(
+  new Date(rows[i][0]),
+  Session.getScriptTimeZone(),
+  "dd/MM/yyyy"
+);
+
+const checkIn =
+rows[i][10]
+?
+Utilities.formatDate(
+  new Date(rows[i][10]),
+  Session.getScriptTimeZone(),
+  "hh:mm a"
+)
+:
+"-";
+
+const checkOut =
+rows[i][11]
+?
+Utilities.formatDate(
+  new Date(rows[i][11]),
+  Session.getScriptTimeZone(),
+  "hh:mm a"
+)
+:
+"-";
+html += `
+<tr>
+<td>${reportDate}</td>
+<td>${checkIn}</td>
+<td>${checkOut}</td>
+<td>${rows[i][12] || "-"}</td>
+</tr>
+`;
+
+    }
+
+  }
+
+  html += "</table>";
+
+  MailApp.sendEmail({
+
+    to:user.email,
+
+    subject:
+    "RRAS Attendance Report",
+
+    htmlBody:html
+
+  });
+
+  return "Attendance report sent to your email.";
+
+}
+function checkDuplicateDevice(deviceInfo, resourceId){
+
+  const ss =
+    SpreadsheetApp.openById(
+      LOGIN_SPREADSHEET_ID
+    );
+
+  const sheet =
+    ss.getSheetByName(
+      "ATTENDANCE_LOG"
+    );
+
+  const rows =
+    sheet.getDataRange()
+    .getValues();
+
+  const today =
+    Utilities.formatDate(
+      new Date(),
+      Session.getScriptTimeZone(),
+      "dd-MM-yyyy"
+    );
+
+  for(let i=rows.length-1;i>=1;i--){
+
+    const rowDate =
+      Utilities.formatDate(
+        new Date(rows[i][0]),
+        Session.getScriptTimeZone(),
+        "dd-MM-yyyy"
+      );
+
+    if(
+      rowDate === today &&
+      String(rows[i][23]).trim() ===
+      String(deviceInfo).trim() &&
+      String(rows[i][9]).trim() !==
+      String(resourceId).trim()
+    ){
+
+      return true;
+
+    }
+
+  }
+
+  return false;
+
+}
+function sendDuplicateMail(userData){
+
+  const ss =
+    SpreadsheetApp.openById(
+      LOGIN_SPREADSHEET_ID
+    );
+
+  const settingsSheet =
+    ss.getSheetByName(
+      "SETTINGS"
+    );
+
+  const ownerEmail =
+    settingsSheet.getRange("D2").getValue();
+
+  MailApp.sendEmail({
+
+    to: ownerEmail,
+
+    subject:
+    "Duplicate Mobile Alert",
+
+    htmlBody:
+
+    "Staff Name : " +
+    userData.name +
+
+    "<br><br>Resource ID : " +
+    userData.resourceId +
+
+    "<br><br>This staff has agreed to check in using a mobile already used today."
+
+  });
+
+}
+function sendDuplicateCheckoutMail(userData){
+
+  const ss = SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const ownerEmail =
+    ss.getSheetByName("SETTINGS")
+      .getRange("D2")
+      .getValue();
+
+  MailApp.sendEmail({
+
+    to: ownerEmail,
+
+    subject: "Duplicate Mobile Alert (Check-Out)",
+
+    htmlBody:
+      "Staff Name : " + userData.name +
+      "<br><br>Resource ID : " + userData.resourceId +
+      "<br><br>This staff has checked out using a mobile already used today."
+
+  });
+
+}
+function changePassword(resourceId, oldPassword, newPassword){
+
+const ss =
+SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+const sheet =
+ss.getSheetByName("STAFF_MASTER");
+
+const data =
+sheet.getDataRange().getValues();
+
+for(let i=1;i<data.length;i++){
+
+if(String(data[i][9]).trim()==String(resourceId).trim()){
+
+if(String(data[i][11]).trim()!=String(oldPassword).trim()){
+
+return{
+
+success:false,
+
+message:"Current Password is incorrect."
+
+};
+
+}
+
+sheet.getRange(i+1,12).setValue(newPassword);
+
+return{
+
+success:true,
+
+message:"Password Changed Successfully.\nPlease Login Again."
+
+};
+
+}
+
+}
+
+return{
+
+success:false,
+
+message:"User Not Found."
+
+};
+
+}
+function getStaffList(adminResourceId){
+
+  const ss =
+    SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const sheet =
+    ss.getSheetByName("STAFF_MASTER");
+
+  const data =
+    sheet.getDataRange().getValues();
+
+  // Verify Admin
+  let isAdmin = false;
+
+  for(let i = 1; i < data.length; i++){
+
+    if(
+      String(data[i][9]).trim() ===
+      String(adminResourceId).trim() &&
+      String(data[i][8]).trim() === "Admin" &&
+      String(data[i][10]).trim().toUpperCase() === "YES"
+    ){
+
+      isAdmin = true;
+      break;
+
+    }
+
+  }
+
+  if(!isAdmin){
+
+    throw new Error("Only Admin can access Staff Management.");
+
+  }
+
+  let result = [];
+
+  for(let i = 1; i < data.length; i++){
+
+    // Exclude Admin
+    if(
+      String(data[i][8]).trim().toLowerCase() === "admin"
+    ){
+      continue;
+    }
+
+    result.push({
+
+      resourceId: data[i][9],
+
+      name: data[i][1],
+
+      role: data[i][8],
+
+      active: data[i][10],
+
+      shift: data[i][12]
+
+    });
+
+  }
+
+  return result;
+
+}
+
+function updateStaffStatus(list, adminResourceId, dateString, examName, totalShift){
+
+  const ss =
+    SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const sheet =
+    ss.getSheetByName("STAFF_MASTER");
+
+  const settings =
+    ss.getSheetByName("SETTINGS");
+
+  const ownerEmail =
+    settings.getRange("D2").getValue();
+
+  const data =
+    sheet.getDataRange().getValues();
+
+  // =================================
+  // VERIFY ADMIN
+  // =================================
+
+  let isAdmin = false;
+
+  for(let i = 1; i < data.length; i++){
+
+    if(
+      String(data[i][9]).trim() ===
+      String(adminResourceId).trim() &&
+      String(data[i][8]).trim() === "Admin" &&
+      String(data[i][10]).trim().toUpperCase() === "YES"
+    ){
+
+      isAdmin = true;
+      break;
+
+    }
+
+  }
+
+  if(!isAdmin){
+
+    throw new Error("Only Admin can update staff details.");
+
+  }
+
+  // =================================
+  // VALIDATE EXAM DETAILS
+  // =================================
+
+  if(
+    !dateString ||
+    !examName ||
+    !String(examName).trim() ||
+    !totalShift
+  ){
+
+    throw new Error("Please fill all Exam Details.");
+
+  }
+
+  totalShift = Number(totalShift);
+
+  if(
+    !Number.isInteger(totalShift) ||
+    totalShift < 1 ||
+    totalShift > 5
+  ){
+
+    throw new Error("Total Shift must be between 1 and 5.");
+
+  }
+
+  const dateParts = dateString.split("-");
+
+  if(
+    dateParts.length !== 3 ||
+    !/^\d{4}-\d{2}-\d{2}$/.test(dateString)
+  ){
+
+    throw new Error("Invalid Exam Date.");
+
+  }
+
+  const examDate = new Date(
+    Number(dateParts[0]),
+    Number(dateParts[1]) - 1,
+    Number(dateParts[2])
+  );
+
+  if(isNaN(examDate.getTime())){
+
+    throw new Error("Invalid Exam Date.");
+
+  }
+
+  const formattedExamDate = Utilities.formatDate(
+    examDate,
+    Session.getScriptTimeZone(),
+    "dd-MM-yyyy"
+  );
+
+  // =================================
+  // ALLOWED ROLES
+  // =================================
+
+  const allowedRoles = [
+    "Center Head",
+    "IT",
+    "Electrician",
+    "Invigilator",
+    "MAF",
+    "Security",
+    "CCTV Operator",
+    "Buffer"
+  ];
+
+  if(!Array.isArray(list)){
+
+    throw new Error("Invalid staff details.");
+
+  }
+
+  // Validate all staff entries before saving
+  list.forEach(function(emp){
+
+    if(!allowedRoles.includes(String(emp.role).trim())){
+
+      throw new Error(
+        "Invalid role selected for Resource ID " +
+        emp.resourceId
+      );
+
+    }
+
+    if(!["YES", "NO"].includes(String(emp.active).toUpperCase())){
+
+      throw new Error(
+        "Invalid Active status for Resource ID " +
+        emp.resourceId
+      );
+
+    }
+
+    const shift = Number(emp.shift);
+
+    if(
+      !Number.isInteger(shift) ||
+      shift < 0 ||
+      shift > 5
+    ){
+
+      throw new Error(
+        "Invalid assigned shift for Resource ID " +
+        emp.resourceId
+      );
+
+    }
+
+  });
+
+  // =================================
+  // SAVE / UPDATE EXAM DETAILS
+  // =================================
+
+  const examSheet =
+    ss.getSheetByName("Exam_Details");
+
+  if(!examSheet){
+
+    throw new Error("Exam_Details sheet not found.");
+
+  }
+
+  const examData =
+    examSheet.getDataRange().getValues();
+
+  let examRecordUpdated = false;
+
+  for(let i = 1; i < examData.length; i++){
+
+    if(!examData[i][1]) continue;
+
+    const existingDate = Utilities.formatDate(
+      new Date(examData[i][1]),
+      Session.getScriptTimeZone(),
+      "dd-MM-yyyy"
+    );
+
+    if(existingDate === formattedExamDate){
+
+      // Update existing record for selected date
+      examSheet.getRange(i + 1, 2, 1, 3).setValues([[
+        examDate,
+        String(examName).trim(),
+        totalShift
+      ]]);
+
+      examRecordUpdated = true;
+
+      break;
+
+    }
+
+  }
+
+  if(!examRecordUpdated){
+
+    // Insert new exam record
+    examSheet.appendRow([
+      new Date(),
+      examDate,
+      String(examName).trim(),
+      totalShift
+    ]);
+
+  }
+
+  // =================================
+  // STORE ROLE CHANGES
+  // =================================
+
+  let roleChanges = [];
+
+  // =================================
+  // UPDATE STAFF DETAILS
+  // =================================
+
+  list.forEach(function(emp){
+
+    for(let i = 1; i < data.length; i++){
+
+      if(
+        String(data[i][9]).trim() ===
+        String(emp.resourceId).trim()
+      ){
+
+        // Do not allow Admin records to be changed
+        if(String(data[i][8]).trim() === "Admin"){
+
+          break;
+
+        }
+
+        const oldRole =
+          String(data[i][8]).trim();
+
+        const newRole =
+          String(emp.role).trim();
+
+        // Update Role - Column I
+        sheet.getRange(i + 1, 9).setValue(newRole);
+
+        // Update Active - Column K
+        sheet.getRange(i + 1, 11).setValue(emp.active);
+
+        // Update Shift - Column M
+        sheet.getRange(i + 1, 13).setValue(Number(emp.shift));
+
+        // Record role changes
+        if(oldRole !== newRole){
+
+          roleChanges.push({
+
+            name: data[i][1],
+
+            resourceId: data[i][9],
+
+            oldRole: oldRole,
+
+            newRole: newRole
+
+          });
+
+        }
+
+        break;
+
+      }
+
+    }
+
+  });
+
+  SpreadsheetApp.flush();
+
+  // =================================
+  // RELOAD UPDATED STAFF DATA
+  // =================================
+
+  const rows =
+    sheet.getDataRange().getValues();
+
+  const today = Utilities.formatDate(
+    new Date(),
+    Session.getScriptTimeZone(),
+    "dd/MM/yyyy hh:mm a"
+  );
+
+  // =================================
+  // ROLE ORDER
+  // =================================
+
+  const roleOrder = [
+    "Center Head",
+    "IT",
+    "Electrician",
+    "Invigilator",
+    "MAF",
+    "Security",
+    "CCTV Operator",
+    "Buffer"
+  ];
+
+  // =================================
+  // DYNAMIC ROLE SUMMARY
+  // EXCLUDE ADMIN
+  // =================================
+
+  let roleSummary = {};
+
+  rows.slice(1).forEach(function(r){
+
+    const role =
+      String(r[8]).trim();
+
+    const active =
+      String(r[10]).trim().toUpperCase();
+
+    if(
+      active === "YES" &&
+      role.toLowerCase() !== "admin" &&
+      role !== ""
+    ){
+
+      if(!roleSummary[role]){
+
+        roleSummary[role] = 0;
+
+      }
+
+      roleSummary[role]++;
+
+    }
+
+  });
+
+  // =================================
+  // SUMMARY HTML
+  // =================================
+
+  let summaryHtml = "";
+
+  roleOrder.forEach(function(role){
+
+    if(roleSummary[role]){
+
+      summaryHtml += `
+
+        <tr>
+
+          <td><b>Total ${role}</b></td>
+
+          <td>${roleSummary[role]}</td>
+
+        </tr>
+
+      `;
+
+    }
+
+  });
+
+  if(summaryHtml === ""){
+
+    summaryHtml = `
+      <tr>
+        <td colspan="2">No Active Staff</td>
+      </tr>
+    `;
+
+  }
+
+  // =================================
+  // ROLE CHANGE REPORT
+  // =================================
+
+  let roleChangeHtml = "";
+
+  if(roleChanges.length > 0){
+
+    roleChangeHtml = `
+
+      <br>
+
+      <h3>Role Changes</h3>
+
+      <table border="1" cellpadding="8" cellspacing="0"
+      style="border-collapse:collapse;">
+
+        <tr style="background:#1e3a8a;color:white;">
+
+          <th>Name</th>
+          <th>Resource ID</th>
+          <th>Previous Role</th>
+          <th>Updated Role</th>
+
+        </tr>
+
+    `;
+
+    roleChanges.forEach(function(emp){
+
+      roleChangeHtml += `
+
+        <tr>
+
+          <td>${emp.name}</td>
+
+          <td>${emp.resourceId}</td>
+
+          <td>${emp.oldRole}</td>
+
+          <td>${emp.newRole}</td>
+
+        </tr>
+
+      `;
+
+    });
+
+    roleChangeHtml += `</table>`;
+
+  }
+
+  // =================================
+  // EMAIL HTML
+  // =================================
+
+  let html = `
+
+    <h2>Staff Duty Assignment Updated</h2>
+
+    <h3>Examination Details</h3>
+
+    <table border="1" cellpadding="8" cellspacing="0"
+    style="border-collapse:collapse;">
+
+      <tr>
+
+        <td><b>Exam Date</b></td>
+
+        <td>${formattedExamDate}</td>
+
+      </tr>
+
+      <tr>
+
+        <td><b>Exam Name</b></td>
+
+        <td>${String(examName).trim()}</td>
+
+      </tr>
+
+      <tr>
+
+        <td><b>Total Shift</b></td>
+
+        <td>${totalShift}</td>
+
+      </tr>
+
+    </table>
+
+    <br>
+
+    <p>
+      <b>Updated On :</b> ${today}
+    </p>
+
+    <h3>Staff Summary</h3>
+
+    <table border="1" cellpadding="6" cellspacing="0"
+    style="border-collapse:collapse;">
+
+      ${summaryHtml}
+
+    </table>
+
+    ${roleChangeHtml}
+
+    <br><br>
+
+    <h3>Active Staff Details</h3>
+
+    <table border="1" cellpadding="8" cellspacing="0"
+    style="border-collapse:collapse;">
+
+      <tr style="background:#1e3a8a;color:white;">
+
+        <th>SL. No.</th>
+        <th>Name</th>
+        <th>Role</th>
+        <th>Resource ID</th>
+        <th>Active</th>
+        <th>Assigned Shift</th>
+
+      </tr>
+
+  `;
+
+  // =================================
+  // ACTIVE STAFF DETAILS
+  // EXCLUDE ADMIN
+  // =================================
+
+  const activeStaff = rows.slice(1).filter(function(r){
+
+    return (
+      String(r[10]).trim().toUpperCase() === "YES" &&
+      String(r[8]).trim().toLowerCase() !== "admin"
+    );
+
+  });
+
+  // Sort staff by role order
+  activeStaff.sort(function(a,b){
+
+    const roleA =
+      roleOrder.indexOf(String(a[8]).trim());
+
+    const roleB =
+      roleOrder.indexOf(String(b[8]).trim());
+
+    return (
+      (roleA === -1 ? 999 : roleA) -
+      (roleB === -1 ? 999 : roleB)
+    );
+
+  });
+
+  let slNo = 1;
+
+  activeStaff.forEach(function(r){
+
+    html += `
+
+      <tr>
+
+        <td>${slNo++}</td>
+
+        <td>${r[1]}</td>
+
+        <td>${r[8]}</td>
+
+        <td>${r[9]}</td>
+
+        <td>${r[10]}</td>
+
+        <td>${r[12]}</td>
+
+      </tr>
+
+    `;
+
+  });
+
+  html += `
+
+    </table>
+
+    <br><br>
+
+    <p>
+      Regards,<br>
+      <b>RRAS Attendance Management System</b><br>
+      Radha Raman Assessment Services Pvt Ltd
+    </p>
+
+  `;
+
+  // =================================
+  // SEND ONE EMAIL
+  // =================================
+
+  MailApp.sendEmail({
+
+    to: ownerEmail,
+
+    subject:
+      "Staff Duty Assignment Updated - " +
+      formattedExamDate +
+      " - " +
+      String(examName).trim(),
+
+    htmlBody: html
+
+  });
+
+  return "Exam Details and Staff Details updated successfully. Email sent to owner.";
+
+}
+
+
+function testGmailService() {
+
+  Logger.log("Starting Gmail authorization test");
+
+  // This operation requires Gmail read permission
+  const threads = GmailApp.getInboxThreads(0, 1);
+
+  Logger.log("Gmail read access successful");
+
+  // Check sending quota
+  const quota = MailApp.getRemainingDailyQuota();
+
+  Logger.log("Remaining daily quota: " + quota);
+
+  Logger.log("Gmail authorization successful");
+
+}
+function getExamDetailsByDate(dateString, adminResourceId){
+
+  const ss = SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const staffSheet = ss.getSheetByName("STAFF_MASTER");
+  const staffData = staffSheet.getDataRange().getValues();
+
+  // Verify Admin
+  const isAdmin = staffData.slice(1).some(function(r){
+
+    return (
+      String(r[9]).trim() === String(adminResourceId).trim() &&
+      String(r[8]).trim() === "Admin" &&
+      String(r[10]).trim().toUpperCase() === "YES"
+    );
+
+  });
+
+  if(!isAdmin){
+    throw new Error("Only Admin can access Exam Details.");
+  }
+
+  const sheet = ss.getSheetByName("Exam_Details");
+  const data = sheet.getDataRange().getValues();
+
+  const parts = dateString.split("-");
+  const selectedDate = Utilities.formatDate(
+    new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2])),
+    Session.getScriptTimeZone(),
+    "dd-MM-yyyy"
+  );
+
+  for(let i = 1; i < data.length; i++){
+
+    const cellDate = data[i][1];
+
+    if(!cellDate) continue;
+
+    const existingDate = Utilities.formatDate(
+      new Date(cellDate),
+      Session.getScriptTimeZone(),
+      "dd-MM-yyyy"
+    );
+
+    if(existingDate === selectedDate){
+
+      return {
+        found: true,
+        examName: data[i][2],
+        totalShift: data[i][3]
+      };
+
+    }
+
+  }
+
+  return {
+    found: false,
+    examName: "",
+    totalShift: ""
+  };
+
+}
+function saveExamDetails(dateString, examName, totalShift, adminResourceId){
+
+  const ss = SpreadsheetApp.openById(LOGIN_SPREADSHEET_ID);
+
+  const staffSheet = ss.getSheetByName("STAFF_MASTER");
+  const staffData = staffSheet.getDataRange().getValues();
+
+  // Verify Admin
+  const isAdmin = staffData.slice(1).some(function(r){
+
+    return (
+      String(r[9]).trim() === String(adminResourceId).trim() &&
+      String(r[8]).trim() === "Admin" &&
+      String(r[10]).trim().toUpperCase() === "YES"
+    );
+
+  });
+
+  if(!isAdmin){
+    throw new Error("Only Admin can update Exam Details.");
+  }
+
+  if(!dateString || !examName.trim() || !totalShift){
+    throw new Error("Please fill all Exam Details.");
+  }
+
+  totalShift = Number(totalShift);
+
+  if(!Number.isInteger(totalShift) || totalShift < 1 || totalShift > 5){
+    throw new Error("Total Shift must be between 1 and 5.");
+  }
+
+  const parts = dateString.split("-");
+
+  const examDate = new Date(
+    Number(parts[0]),
+    Number(parts[1])-1,
+    Number(parts[2])
+  );
+
+  if(isNaN(examDate.getTime())){
+    throw new Error("Invalid exam date.");
+  }
+
+  const formattedDate = Utilities.formatDate(
+    examDate,
+    Session.getScriptTimeZone(),
+    "dd-MM-yyyy"
+  );
+
+  const sheet = ss.getSheetByName("Exam_Details");
+
+  const data = sheet.getDataRange().getValues();
+
+  // Check whether date already exists
+  for(let i = 1; i < data.length; i++){
+
+    if(!data[i][1]) continue;
+
+    const existingDate = Utilities.formatDate(
+      new Date(data[i][1]),
+      Session.getScriptTimeZone(),
+      "dd-MM-yyyy"
+    );
+
+    if(existingDate === formattedDate){
+
+      // Update existing row
+      sheet.getRange(i+1, 2, 1, 3).setValues([[
+        examDate,
+        examName.trim(),
+        totalShift
+      ]]);
+
+      return "Exam Details Updated Successfully.";
+
+    }
+
+  }
+
+  // Insert new exam record
+  sheet.appendRow([
+    new Date(),
+    examDate,
+    examName.trim(),
+    totalShift
+  ]);
+
+  return "New Exam Details Saved Successfully.";
+
+}
